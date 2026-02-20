@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -131,8 +130,8 @@
         let initialTime = 0; 
         let isRunning = false; 
 
-        // ベルの音源（Googleのフリー効果音を使用）
-        const bellAudio = new Audio('https://actions.google.com/sounds/v1/alarms/bell_ding.ogg');
+        // ベルの音源をローカルファイルに変更
+        const bellAudio = new Audio('bell.mp3');
 
         // 時間表示をMM:SS形式で更新する関数
         function updateDisplay() {
