@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プレゼンタイマー</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .timer-container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+        }
+        .input-group {
+            margin-bottom: 30px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #333;
+        }
+        .input-group input[type="number"] {
+            width: 150px;
+            padding: 12px;
+            font-size: 1.5em;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            -moz-appearance: textfield; /* Firefox のスピナーを非表示に */
+        }
+        .input-group input[type="number"]::-webkit-outer-spin-button,
+        .input-group input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; /* Chrome, Safari のスピナーを非表示に */
+            margin: 0;
+        }
+        #timerDisplay {
+            font-size: 6em;
+            font-weight: bold;
+            margin-bottom: 40px;
+            color: #333;
+            background-color: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            letter-spacing: 5px;
+            min-width: 280px; /* 少なくとも00:00が表示される幅 */
+        }
+        .controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            min-width: 120px;
+        }
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+        .controls button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #pauseButton {
+            background-color: #ffc107;
+            color: #333;
+        }
+        #pauseButton:hover {
+            background-color: #e0a800;
+        }
+        #resetButton {
+            background-color: #dc3545;
+        }
+        #resetButton:hover {
+            background-color: #c82333;
+        }
+        @media (max-width: 600px) {
+            #timerDisplay {
+                font-size: 4em;
+            }
+            .controls button {
+                font-size: 1em;
+                padding: 12px 20px;
+                min-width: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="timer-container">
+        <div class="input-group">
+            <label for="minutesInput">タイマー時間 (分)</label>
+            <input type="number" id="minutesInput" value="5" min="1">
+        </div>
+        <div id="timerDisplay">05:00</div>
+        <div class="controls">
+            <button id="startButton">開始</button>
+            <button id="pauseButton">一時停止</button>
+            <button id="resetButton">リセット</button>
+        </div>
+    </div>
+
+    <script>
+        const minutesInput = document.getElementById('minutesInput');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const startButton = document.getElementById('startButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const resetButton = document.getElementById('resetButton');
+
+        let timerId = null; 
+        let remainingTime = 0; 
+        let initialTime = 0; 
+        let isRunning = false; 
+
+        // ベルの音源（Googleのフリー効果音を使用）
+        const bellAudio = new Audio('https://actions.google.com/sounds/v1/alarms/bell_ding.ogg');
+
+        // 時間表示をMM:SS形式で更新する関数
+        function updateDisplay() {
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            timerDisplay.textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // ボタンの状態を更新する関数
+        function updateButtons() {
+            if (isRunning) {
+                startButton.disabled = true;
+                pauseButton.disabled = false;
+                resetButton.disabled = false;
+            } else {
+                startButton.disabled = false;
+                pauseButton.disabled = true;
+                
+                // タイマーが初期状態か、終了状態の場合
+                if (remainingTime === initialTime || remainingTime === 0) {
+                    startButton.textContent = '開始';
+                    resetButton.disabled = true; // 初期状態や終了状態ではリセットは無効
+                } else {
+                    startButton.textContent = '再開';
+                    resetButton.disabled = false; // 一時停止中はリセット有効
+                }
+            }
+        }
+
+        // タイマーが終了したときの処理
+        function timerEnd() {
+            clearInterval(timerId);
+            isRunning = false;
+            
+            // ベルを2回鳴らす
+            bellAudio.play();
+            setTimeout(() => {
+                bellAudio.play();
+            }, 1000); // 1秒間隔で2回鳴らす
+            
+            updateButtons(); // ボタンの状態を更新
+        }
+
+        // カウントダウン処理
+        function countdown() {
+            if (remainingTime <= 0) {
+                timerEnd();
+                return;
+            }
+            remainingTime--;
+            updateDisplay();
+        }
+
+        // タイマーの初期化（ページロード時や分数変更時）
+        function initializeTimer() {
+            if (timerId) {
+                clearInterval(timerId);
+            }
+            isRunning = false;
+
+            const minutes = parseInt(minutesInput.value, 10);
+            if (isNaN(minutes) || minutes <= 0) {
+                minutesInput.value = 1; // 無効な値の場合は1分に設定
+                initialTime = 60; // 60秒
+            } else {
+                initialTime = minutes * 60;
+            }
+            remainingTime = initialTime;
+            updateDisplay();
+            updateButtons(); // ボタンの状態を初期化
+        }
+
+        // 開始/再開ボタンのイベントリスナー
+        startButton.addEventListener('click', () => {
+            if (!isRunning) {
+                // 入力値のチェック
+                const minutes = parseInt(minutesInput.value, 10);
+                if (isNaN(minutes) || minutes <= 0) {
+                    alert('有効な分数を入力してください (1分以上)。');
+                    initializeTimer(); // 不正な入力があったらタイマーを初期状態に戻す
+                    return;
+                }
+                
+                // タイマーが終了している状態 (remainingTime === 0) で開始する場合、
+                // またはminutesInputの値が変更されたがまだ開始されていない場合にinitialTimeを再設定
+                if (remainingTime === 0 || initialTime !== minutes * 60) {
+                    initialTime = minutes * 60;
+                    remainingTime = initialTime;
+                    updateDisplay(); 
+                }
+                // 一時停止状態からの再開 (remainingTime > 0 && isRunning === false) の場合は、
+                // 現在のremainingTimeを使ってそのまま開始
+                
+                timerId = setInterval(countdown, 1000); // 1秒ごとにcountdown関数を実行
+                isRunning = true;
+                updateButtons();
+            }
+        });
+
+        // 一時停止ボタンのイベントリスナー
+        pauseButton.addEventListener('click', () => {
+            if (isRunning) {
+                clearInterval(timerId);
+                isRunning = false;
+                updateButtons();
+            }
+        });
+
+        // リセットボタンのイベントリスナー
+        resetButton.addEventListener('click', () => {
+            clearInterval(timerId);
+            isRunning = false;
+            remainingTime = initialTime; // 初期時間にリセット
+            updateDisplay();
+            updateButtons();
+        });
+
+        // 分数入力フィールドの値が変更されたらタイマーを初期化
+        minutesInput.addEventListener('change', () => {
+            initializeTimer();
+        });
+        
+        // ページ読み込み時にタイマーを初期化
+        window.addEventListener('load', initializeTimer);
+    </script>
+</body>
+</html>
